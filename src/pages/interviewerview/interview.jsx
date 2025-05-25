@@ -3,6 +3,7 @@ import styles from './interview.module.css';
 import { applicantService } from '../../data/applicant-service';
 import { scheduleService } from '../../data/scheduleService';
 import { interviewerService } from '../../data/interviewer-service';
+import { scoreService } from '../../data/score-service';
 import logo from '../../assets/logo.jpeg';
 
 export default function InterviewSchedule() {
@@ -18,6 +19,14 @@ export default function InterviewSchedule() {
   const [editSchedule, setEditSchedule] = useState(null);
   const [showScoreEdit, setShowScoreEdit] = useState(false);
   const [interviewer, setInterviewer] = useState(null);
+  const [editingScore, setEditingScore] = useState(null);
+  const [scoreForm, setScoreForm] = useState({
+    score: '',
+    comments: ''
+  });
+  const [activeNav, setActiveNav] = useState('dashboard');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFilter, setSelectedFilter] = useState('');
 
   useEffect(() => {
     fetchApplicants();
@@ -72,12 +81,17 @@ export default function InterviewSchedule() {
 
   const fetchScores = async () => {
     try {
-      const data = await applicantService.getAllScores();
-      console.log('Fetched scores:', data); // For debugging
-      setScores(data.data || []); // Access the data property from the response
+      const response = await scoreService.getAllScores();
+      console.log('Fetched scores:', response); // For debugging
+      if (Array.isArray(response)) {
+        setScores(response);
+      } else {
+        setScores([]); // Set empty array if no scores
+      }
     } catch (err) {
-      console.error('Error fetching scores:', err); // For debugging
+      console.error('Error fetching scores:', err);
       setError(err.message);
+      setScores([]); // Set empty array on error
     }
   };
 
@@ -124,12 +138,53 @@ export default function InterviewSchedule() {
     });
   };
 
-  const handleEditScores = () => {
-    if (selectedScores.length === 0) {
-      alert('Please select applicants to edit scores');
-      return;
+  const handleEditScores = async (scoreId) => {
+    try {
+      const score = await scoreService.getScore(scoreId);
+      setEditingScore(score);
+      setScoreForm({
+        score: score.score,
+        comments: score.comments || ''
+      });
+      setShowScoreEdit(true);
+    } catch (err) {
+      console.error('Error fetching score details:', err);
+      setError(err.message);
     }
-    setShowScoreEdit(true);
+  };
+
+  const handleScoreSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const scoreData = {
+        interview_schedule_id: editingScore.interview_schedule_id,
+        score: parseInt(scoreForm.score),
+        comments: scoreForm.comments || ''
+      };
+      
+      console.log('Submitting score data:', scoreData); // Debug log
+      
+      await scoreService.createOrUpdateScore(scoreData);
+      
+      setShowScoreEdit(false);
+      setEditingScore(null);
+      setScoreForm({ score: '', comments: '' });
+      await fetchScores(); // Refresh scores after update
+      
+    } catch (err) {
+      console.error('Error saving score:', err);
+      setError(err.message);
+    }
+  };
+
+  const handleSearch = (e) => {
+    setSearchQuery(e.target.value);
+    // Implement your search logic here
+  };
+
+  const handleFilterChange = (e) => {
+    setSelectedFilter(e.target.value);
+    // Implement your filter logic here
   };
 
   return (
@@ -140,27 +195,74 @@ export default function InterviewSchedule() {
           <h1>Beastlink University</h1>
         </div>
         <nav className={styles.nav}>
-          <button>Dashboard</button>
-          <button>Schedule List</button>
-          <button>Settings and profile</button>
+          <button 
+            className={activeNav === 'dashboard' ? styles.active : ''}
+            onClick={() => setActiveNav('dashboard')}
+          >
+            Dashboard
+          </button>
+          <button 
+            className={activeNav === 'schedules' ? styles.active : ''}
+            onClick={() => setActiveNav('schedules')}
+          >
+            Applicants
+          </button>
+          <button 
+            className={activeNav === 'admission' ? styles.active : ''}
+            onClick={() => setActiveNav('admission')}
+          >
+            Admission Form
+          </button>
+          <button 
+            className={activeNav === 'promotion' ? styles.active : ''}
+            onClick={() => setActiveNav('promotion')}
+          >
+            Student Promotion
+          </button>
+          <button 
+            className={activeNav === 'class' ? styles.active : ''}
+            onClick={() => setActiveNav('class')}
+          >
+            Class
+          </button>
         </nav>
       </aside>
 
       <main className={styles.mainContent}>
         <header className={styles.header}>
           <div className={styles.searchContainer}>
-            <select className={styles.filterSelect}>
-              <option value="">Add filter</option>
+            <select 
+              className={styles.filterSelect}
+              value={selectedFilter}
+              onChange={handleFilterChange}
+            >
+              <option value="">Filter by...</option>
               <option value="program">Program</option>
               <option value="status">Status</option>
+              <option value="schedule">Schedule</option>
             </select>
             <div className={styles.searchBox}>
-              <input type="search" placeholder="Search Courses" />
+              <input 
+                type="search" 
+                placeholder="Search applicants..." 
+                value={searchQuery}
+                onChange={handleSearch}
+              />
             </div>
           </div>
           <div className={styles.headerActions}>
-            <button className={styles.notificationBtn}>🔔</button>
-            <button className={styles.logoutBtn}>Log out</button>
+            <button 
+              className={styles.notificationBtn}
+              title="Notifications"
+            >
+              🔔
+            </button>
+            <button 
+              className={styles.logoutBtn}
+              onClick={() => {/* Add logout logic */}}
+            >
+              Log out
+            </button>
           </div>
         </header>
 
@@ -292,28 +394,28 @@ export default function InterviewSchedule() {
               </thead>
               <tbody>
                 {scores.map((score) => (
-                  <tr key={score.applicant_id}>
+                  <tr key={score.id || score.interview_schedule_id}>
                     <td>
                       <input 
                         type="checkbox"
-                        checked={selectedScores.includes(score.applicant_id)}
-                        onChange={() => handleScoreSelect(score.applicant_id)}
+                        checked={selectedScores.includes(score.interview_schedule_id)}
+                        onChange={() => handleScoreSelect(score.interview_schedule_id)}
                       />
                     </td>
-                    <td>{score.applicant_id}</td>
+                    <td>{score.interview_schedule?.applicant_id}</td>
                     <td>{score.applicant?.last_name}</td>
                     <td>{score.applicant?.first_name}</td>
                     <td>{score.applicant?.middle_name}</td>
                     <td>{score.score}/100</td>
                     <td>
                       <span className={`${styles.status} ${styles[score.status?.toLowerCase()]}`}>
-                        {score.status}
+                        {score.status || 'Pending'}
                       </span>
                     </td>
                     <td>
                       <button 
                         className={styles.editButton}
-                        onClick={() => handleEditScores(score.applicant_id)}
+                        onClick={() => handleEditScores(score.id)}
                       >
                         Edit Score
                       </button>
@@ -323,6 +425,42 @@ export default function InterviewSchedule() {
               </tbody>
             </table>
           ) : null}
+
+          {showScoreEdit && editingScore && (
+            <div className={styles.modal}>
+              <div className={styles.modalContent}>
+                <h2>Edit Score</h2>
+                <form onSubmit={handleScoreSubmit}>
+                  <div className={styles.formGroup}>
+                    <label>Score:</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={scoreForm.score}
+                      onChange={(e) => setScoreForm({...scoreForm, score: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label>Comments:</label>
+                    <textarea
+                      value={scoreForm.comments}
+                      onChange={(e) => setScoreForm({...scoreForm, comments: e.target.value})}
+                      rows="4"
+                    />
+                  </div>
+                  <div className={styles.modalActions}>
+                    <button type="submit">Save Changes</button>
+                    <button type="button" onClick={() => {
+                      setShowScoreEdit(false);
+                      setEditingScore(null);
+                    }}>Cancel</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </section>
       </main>
     </div>

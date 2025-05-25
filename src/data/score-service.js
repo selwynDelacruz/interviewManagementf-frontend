@@ -2,19 +2,33 @@ import { fetchAPI } from './api-config';
 
 export const scoreService = {
   // Get all scores
-  getAllScores: () => fetchAPI('/scores'),
+  getAllScores: async () => {
+    return await fetchAPI('/scores');
+  },
 
   // Get single score
-  getScore: (id) => fetchAPI(`/scores/${id}`),
+  getScore: async (id) => {
+    return await fetchAPI(`/scores/${id}`);
+  },
 
-  // Create new score
-  createScore: (data) => fetchAPI('/scores', {
-    method: 'POST',
-    body: JSON.stringify(data)
-  }),
+  // Separate create and update methods
+  createScore: async (data) => {
+    return await fetchAPI('/scores', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+  },
 
-  // Delete score
-  deleteScore: (id) => fetchAPI(`/scores/${id}`, {
-    method: 'DELETE'
-  })
+  updateScore: async (id, data) => {
+    return await fetchAPI(`/scores/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+  }
 };
